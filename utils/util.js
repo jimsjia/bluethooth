@@ -30,6 +30,7 @@ const hexStringToBuff = str => { //str='中国：WXHSH'
         //var code = t[j * 2] + t[j * 2 + 1];
         var code = t[j * 3 + 1] + t[j * 3 + 2];
          var temp = parseInt(code, 16)
+         console.log(temp)
         //var temp = strToHexCharCode(code);
         dataView.setUint8(p++, temp)
       }

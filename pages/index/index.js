@@ -1,4 +1,5 @@
 const app = getApp()
+var tsc = require('../../js/tsc.js');
 var util = require('../../utils/util.js');
 var time = 0;
 var imageData = [];
@@ -14,11 +15,13 @@ function inArray(arr, key, val) {
   return -1;
 }
 
+
+
 // ArrayBuffer转16进度字符串示例
 function ab2hex(buffer) {
   var hexArr = Array.prototype.map.call(
     new Uint8Array(buffer),
-    function (bit) {
+    function(bit) {
       return ('00' + bit.toString(16)).slice(-2)
     }
   )
@@ -43,7 +46,6 @@ function strToBinary(str) {
 
 Page({
   data: {
-
     devices: [],
     connected: false,
     chs: [],
@@ -57,7 +59,7 @@ Page({
       },
       fail: (res) => {
         if (res.errCode === 10001) {
-          wx.onBluetoothAdapterStateChange(function (res) {
+          wx.onBluetoothAdapterStateChange(function(res) {
             console.log('onBluetoothAdapterStateChange', res)
             if (res.available) {
               this.startBluetoothDevicesDiscovery()
@@ -187,7 +189,7 @@ Page({
             this._deviceId = deviceId
             this._serviceId = serviceId
             this._characteristicId = item.uuid
-            //this.writeBLECharacteristicValue()
+            // this.writeBLECharacteristicValue()
           }
           if (item.properties.notify || item.properties.indicate) {
             wx.notifyBLECharacteristicValueChange({
@@ -226,34 +228,89 @@ Page({
     })
   },
 
+  senBlData(deviceId, serviceId, characteristicId, uint8Array) {
+    console.log('************deviceId = [' + deviceId + ']  serviceId = [' + serviceId + '] characteristics=[' + characteristicId + "]")
+    var uint8Buf = Array.from(uint8Array);
 
-  writeBLECharacteristicValue() {
-    k = 0;
-    strArray = [];
-    strArray[0] = "采购单\n";
-    strArray[1] = "大白菜     5千克\n";
-    strArray[2] = "土豆       5千克\n";
-    strArray[3] = "牛肉       5千克\n";
-    strArray[4] = "花菜       5千克\n";
-    strArray[5] = "西红柿     5千克\n";
-    strArray[6] = "青辣椒     5千克\n";
-    this.printText();
-
-  },
-  printText: function () {
-    var that = this;
-    if (k < strArray.length) {
-      var bufferstr = util.hexStringToBuff(strArray[k]);
-
-      this.sendStr(bufferstr, function (success) {
-        k++;
-        that.printText();
-      }, function (error) {
-
-      });
+    function split_array(datas, size) {
+      var result = {};
+      var j = 0
+      for (var i = 0; i < datas.length; i += size) {
+        result[j] = datas.slice(i, i + size)
+        j++
+      }
+      // console.log(result)
+      return result
     }
+    var sendloop = split_array(uint8Buf, 20);
+    // console.log(sendloop.length)
+    function realWriteData(sendloop, i) {
+      var data = sendloop[i]
+      if (typeof(data) == "undefined") {
+        return
+      }
+      // console.log("第【" + i + "】次写数据" + data)
+      var buffer = new ArrayBuffer(data.length)
+      var dataView = new DataView(buffer)
+      for (var j = 0; j < data.length; j++) {
+        dataView.setUint8(j, data[j]);
+      }
+      wx.writeBLECharacteristicValue({
+        deviceId,
+        serviceId,
+        characteristicId,
+        value: buffer,
+        success(res) {
+          realWriteData(sendloop, i + 1);
+        }
+      })
+    }
+    var i = 0;
+    realWriteData(sendloop, i);
   },
+  senBleLabel() {
+    //标签模式
+    // TSCObj.setText("a", "b", "c", "d", "e", "f", "g");
+    // a：字符串，文字X方向起始点，以点表示。
+    // b：字符串，文字Y方向起始点，以点表示。
+    // c：內建字型名称，共12种（1:  8 * 12 dots 2:  12 * 20 dots 3:  16 * 24 dots 4:  24 * 32 dots 5:  32 * 48 dots TST24.BF2:  繁體中文 24 * 24 TST16.BF2:  繁體中文 16 * 16 TTT24.BF2:  繁體中文 24 * 24 (電信碼) TSS24.BF2:  簡體中文 24 * 24 TSS16.BF2:  簡體中文 16 * 16 K:  韓文 24 * 24 L:  韓文 16 * 16 ）
+    // d：字符串，旋转角度
+    // e：字符串，X方向放大倍率1 - 8
+    // f：字符串，Y方向放大倍率1 - 8
+    // g：字符串，打印内容
+    // ActiveXwindowsfont(a, b, c, d, e, f, g, h)
+    // 说明：使用Windows TTF字体打印文字。
+    // 参数：
+    // a：整数类型，文字X方向起始点，以点表示。
+    // b：整数类型，文字Y方向起始点，以点表示。
+    // c：整数类型，字体高度，以点表示。
+    // d：整数类型，旋转角度，逆时针方向旋转。0 - 旋转0°，90 - 旋转90°，180 - 旋转180°，270 - 旋转270°。
+    // e：整数类型，字体外形。0：标签；1：斜体；2：粗体；3：粗斜体。
+    // f：整数类型，下划线，0：无下划线；1：加下划线。
+    // g：字符串类型，字体名称。如：Arial，Times new Roman。
+    // h：字符串类型，打印文字内容。
 
+    let deviceId = this._deviceId;
+    let serviceId = this._serviceId;
+    let characteristicId = this._characteristicId;
+    var command = tsc.jpPrinter.createNew()
+    var data=[]
+    data = [{ '0': '品牌：xxx' }, { '1': '品名：未来风衣' }, { '2': 'xxxxxx111' }, { '3': '尺码：L' }, { '4': '面料：35%纳米，65%黄金' }, { '5': '里料：100%皮革' }, { '6': '等级：合格品' }, { '7': '检验员：xxx' }, { '8': '执行标准：xxxx' }, { '9': '安全技术类别：B类' }, { '10': '产地：火星' }, { '11': '洗涤方式：自清洁' }, { '12': '统一零售价：RMB 99999.00' }, { '13': 'xxxxxx111' }]
+    command.setSize(40, 80)
+    command.setGap(2)
+    command.setCls()
+    command.setText(100, 20, "TSS24.BF2", 2, 2, "合格证")
+    //循环输出条码项目
+    for(var i=0;i<data.length-2;i++){
+      command.setText(20, (90 + (30 * i)), "TSS24.BF2", 1, 1, data[i][i])
+    }
+    //最后的售价和条码固定在底部，单独列出
+    command.setText(20, 530, "TSS24.BF2", 1, 1, data[data.length - 2][data.length - 2])
+    command.setBar(96, 564, "128M", 48, 0, 1, 2, data[data.length - 1][data.length - 1])
+    command.setPagePrint()
+    this.senBlData(deviceId, serviceId, characteristicId, command.getData())
+  },
+  
   //断开与低功耗蓝牙设备的连接
   closeBLEConnection() {
     wx.closeBLEConnection({
@@ -269,41 +326,5 @@ Page({
   closeBluetoothAdapter() {
     wx.closeBluetoothAdapter()
     this._discoveryStarted = false
-  },
-
-  sendStr: function (bufferstr, success, failed) {
-    var that = this;
-    wx.writeBLECharacteristicValue({
-      deviceId: this._deviceId,
-      serviceId: this._serviceId,
-      characteristicId: this._characteristicId,
-      value: bufferstr,
-      success: function (res) {
-        success(res);
-        console.log('发送的数据：' + bufferstr)
-        console.log('message发送成功')
-      },
-      failed: function (res) {
-        fail(res)
-        console.log("数据发送失败:" + JSON.stringify(res))
-      },
-      complete: function (res) {
-        console.log("发送完成:" + JSON.stringify(res))
-      }
-    })
-
-  },
-
-  hexCharCodeToStr(hexCharCodeStr) {
-    var trimedStr = hexCharCodeStr.trim();
-    var rawStr = trimedStr.substr(0, 2).toLowerCase() === '0x' ? trimedStr.substr(2) : trimedStr;
-    var len = rawStr.length;
-    var curCharCode;
-    var resultStr = [];
-    for (var i = 0; i < len; i = i + 2) {
-      curCharCode = parseInt(rawStr.substr(i, 2), 16);
-      resultStr.push(String.fromCharCode(curCharCode));
-    }
-    return resultStr.join('');
   }
 })
